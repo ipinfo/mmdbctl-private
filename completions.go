@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/ipinfo/cli/lib/complete"
 	"github.com/ipinfo/cli/lib/complete/predict"
+	zipcmd "github.com/ipinfo/mmdbctl/mmdbzip/cmd"
 )
 
 var completions = &complete.Command{
@@ -14,6 +15,7 @@ var completions = &complete.Command{
 		"metadata":   completionsMetadata,
 		"verify":     completionsVerify,
 		"completion": completionsCompletion,
+		"zip":        zipcmd.Completions(),
 	},
 	Flags: map[string]complete.Predictor{
 		"--nocolor": predict.Nothing,
