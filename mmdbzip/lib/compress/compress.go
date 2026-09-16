@@ -127,7 +127,7 @@ func optimize(logger *slog.Logger,
 	if err != nil {
 		return result, fmt.Errorf("Failure during canonicalization: %w", err)
 	}
-	result.OutputNodeCount = uint32(len(canon.outNodes))
+	result.OutputNodeCount = uint32(len(canon))
 	result.OutputTreeBytes = uint64(result.OutputNodeCount) * nodeBytes
 	logger.Debug(fmt.Sprintf("phase1: canonicalize done in %s — %d -> %d nodes (%+.2f%%)",
 		time.Since(canonicalizeStartTime).Round(time.Millisecond),
@@ -145,7 +145,7 @@ func optimize(logger *slog.Logger,
 	// rewrite tree leaf pointers with the new offsets.
 	emittedData := dataSection
 	if !disableCompact {
-		compactBytes, err := compact(logger, &canon, dataSection)
+		compactBytes, err := compact(logger, canon, dataSection)
 		if err != nil {
 			// We don't format error as the error we receive is already formatted
 			return result, err
@@ -207,47 +207,6 @@ func optimize(logger *slog.Logger,
 	return result, nil
 }
 
-// TODO: Maybe we can move this in compact.go
-func compact(logger *slog.Logger, canon *canonResult, dataSection []byte) ([]byte, error) {
-	rootSet := make(map[uint32]struct{}, len(canon.outNodes))
-	for _, n := range canon.outNodes {
-		if n.left.kind == dataKind {
-			rootSet[n.left.id] = struct{}{}
-		}
-		if n.right.kind == dataKind {
-			rootSet[n.right.id] = struct{}{}
-		}
-	}
-	roots := make([]uint32, 0, len(rootSet))
-	for o := range rootSet {
-		roots = append(roots, o)
-	}
-	logger.Debug(fmt.Sprintf("phase1.5: data-section compaction (%s -> ?)", HumanBytes(uint64(len(dataSection)))))
-
-	cmp, err := compactDataSection(logger, dataSection, roots)
-	if err != nil {
-		return nil, fmt.Errorf("compact: %w", err)
-	}
-	// Rewrite tree-leaf pointer ids to reference new offsets.
-	for i := range canon.outNodes {
-		if canon.outNodes[i].left.kind == dataKind {
-			newOff, ok := cmp.offsetMap[canon.outNodes[i].left.id]
-			if !ok {
-				return nil, fmt.Errorf("missing offsetMap entry for tree leaf left id %d", canon.outNodes[i].left.id)
-			}
-			canon.outNodes[i].left.id = newOff
-		}
-		if canon.outNodes[i].right.kind == dataKind {
-			newOff, ok := cmp.offsetMap[canon.outNodes[i].right.id]
-			if !ok {
-				return nil, fmt.Errorf("missing offsetMap entry for tree leaf right id %d", canon.outNodes[i].right.id)
-			}
-			canon.outNodes[i].right.id = newOff
-		}
-	}
-	return cmp.bytes, nil
-}
-
 func logMemory(logger *slog.Logger, label string) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
@@ -255,12 +214,12 @@ func logMemory(logger *slog.Logger, label string) {
 		label, HumanBytes(m.Alloc), HumanBytes(m.Sys), HumanBytes(m.HeapInuse)))
 }
 
-func emitTree(c canonResult, recordSize uint64, outNodeCount uint32) ([]byte, error) {
+func emitTree(nodes canonNodes, recordSize uint64, outNodeCount uint32) ([]byte, error) {
 	nodeBytes := recordSize / 4
 	out := make([]byte, uint64(outNodeCount)*nodeBytes)
 	for i := range outNodeCount {
-		left := pointerToTreeValue(c.outNodes[i].left, outNodeCount)
-		right := pointerToTreeValue(c.outNodes[i].right, outNodeCount)
+		left := pointerToTreeValue(nodes[i].left, outNodeCount)
+		right := pointerToTreeValue(nodes[i].right, outNodeCount)
 		if err := writeNodePair(out, i, recordSize, left, right); err != nil {
 			return nil, err
 		}

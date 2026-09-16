@@ -6,13 +6,11 @@ import (
 	"time"
 )
 
-// canonResult is the bottom-up canonical assignment: a slice of canonical
+// canonNodes is the bottom-up canonical assignment: a slice of canonical
 // nodes, each holding two child pointers in the *output* numbering. The
 // input tree's root is pinned at output index 0 unconditionally (see
 // canonicalize), so there is no separate root flag or pointer.
-type canonResult struct {
-	outNodes []canonNode // index = output node index (0 = root)
-}
+type canonNodes = []canonNode
 
 type canonNode struct {
 	left, right pointer
@@ -44,15 +42,15 @@ type frame struct {
 	post bool
 }
 
-func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize uint64) (canonResult, error) {
+func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize uint64) (canonNodes, error) {
 	state := make([]uint8, nodeCount)           // 0 unvisited, 1 visiting, 2 done
 	canonicalValue := make([]uint64, nodeCount) // encoded pointer per input node
 	canonical := make(map[canonicalKey]uint32)  // canonicalKey -> output node index
 
-	out := []canonNode{}
+	output := []canonNode{}
 	// Pin output index 0 for the root. Will fill it in after the post-order
 	// pass on root completes; until then leave a placeholder.
-	out = append(out, canonNode{})
+	output = append(output, canonNode{})
 
 	// Progress: log every ~5% finalized nodes (or every 10s, whichever first).
 	finalized := uint32(0)
@@ -67,20 +65,20 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 		next := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		if next.idx >= nodeCount {
-			return canonResult{}, fmt.Errorf("internal: idx %d >= node_count %d", next.idx, nodeCount)
+			return canonNodes{}, fmt.Errorf("internal: idx %d >= node_count %d", next.idx, nodeCount)
 		}
 		if !next.post {
 			switch state[next.idx] {
 			case 2:
 				continue
 			case 1:
-				return canonResult{}, fmt.Errorf("cycle at node %d", next.idx)
+				return canonNodes{}, fmt.Errorf("cycle at node %d", next.idx)
 			}
 			state[next.idx] = 1
 			stack = append(stack, frame{idx: next.idx, post: true})
 			left, right, err := readNodePair(buf, next.idx, recordSize)
 			if err != nil {
-				return canonResult{}, err
+				return canonNodes{}, err
 			}
 			if right < nodeCount && state[right] == 0 {
 				stack = append(stack, frame{idx: right})
@@ -94,15 +92,15 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 		// Post-order visit: compute encoded child pointers + intern.
 		left, right, err := readNodePair(buf, next.idx, recordSize)
 		if err != nil {
-			return canonResult{}, err
+			return canonNodes{}, err
 		}
 		leftEnc, err := encodeChild(left, nodeCount, canonicalValue, state)
 		if err != nil {
-			return canonResult{}, fmt.Errorf("node %d left: %w", next.idx, err)
+			return canonNodes{}, fmt.Errorf("node %d left: %w", next.idx, err)
 		}
 		rightEnc, err := encodeChild(right, nodeCount, canonicalValue, state)
 		if err != nil {
-			return canonResult{}, fmt.Errorf("node %d right: %w", next.idx, err)
+			return canonNodes{}, fmt.Errorf("node %d right: %w", next.idx, err)
 		}
 		if leftEnc == 0 && rightEnc == 0 && next.idx != 0 {
 			canonicalValue[next.idx] = 0
@@ -113,7 +111,7 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 			// Pin the root at output index 0. If both children are null we
 			// still emit a single root node (a "no records" MMDB has one node
 			// with two null pointers — a valid, if useless, mmdb).
-			out[0] = canonNode{left: decodePointer(leftEnc), right: decodePointer(rightEnc)}
+			output[0] = canonNode{left: decodePointer(leftEnc), right: decodePointer(rightEnc)}
 			canonicalValue[next.idx] = encodePointer(pointer{kind: nodeKind, id: 0})
 			state[next.idx] = 2
 			continue
@@ -121,8 +119,8 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 		key := canonicalKey{left: leftEnc, right: rightEnc}
 		id, ok := canonical[key]
 		if !ok {
-			id = uint32(len(out))
-			out = append(out, canonNode{left: decodePointer(leftEnc), right: decodePointer(rightEnc)})
+			id = uint32(len(output))
+			output = append(output, canonNode{left: decodePointer(leftEnc), right: decodePointer(rightEnc)})
 			canonical[key] = id
 		}
 		canonicalValue[next.idx] = encodePointer(pointer{kind: nodeKind, id: id})
@@ -133,12 +131,12 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 				finalized,
 				nodeCount,
 				100.0*float64(finalized)/float64(nodeCount),
-				len(out),
+				len(output),
 			))
 			tProgress = time.Now()
 		}
 	}
-	return canonResult{outNodes: out}, nil
+	return output, nil
 }
 
 func readNodePair(buf []byte, idx uint32, recordSize uint64) (uint32, uint32, error) {

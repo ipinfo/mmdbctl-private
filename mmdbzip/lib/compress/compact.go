@@ -39,6 +39,46 @@ type ptrLoc struct {
 	width uint8
 }
 
+func compact(logger *slog.Logger, canon canonNodes, dataSection []byte) ([]byte, error) {
+	rootSet := make(map[uint32]struct{}, len(canon))
+	for _, n := range canon {
+		if n.left.kind == dataKind {
+			rootSet[n.left.id] = struct{}{}
+		}
+		if n.right.kind == dataKind {
+			rootSet[n.right.id] = struct{}{}
+		}
+	}
+	roots := make([]uint32, 0, len(rootSet))
+	for o := range rootSet {
+		roots = append(roots, o)
+	}
+	logger.Debug(fmt.Sprintf("phase1.5: data-section compaction (%s -> ?)", HumanBytes(uint64(len(dataSection)))))
+
+	cmp, err := compactDataSection(logger, dataSection, roots)
+	if err != nil {
+		return nil, fmt.Errorf("compact: %w", err)
+	}
+	// Rewrite tree-leaf pointer ids to reference new offsets.
+	for i := range canon {
+		if canon[i].left.kind == dataKind {
+			newOff, ok := cmp.offsetMap[canon[i].left.id]
+			if !ok {
+				return nil, fmt.Errorf("missing offsetMap entry for tree leaf left id %d", canon[i].left.id)
+			}
+			canon[i].left.id = newOff
+		}
+		if canon[i].right.kind == dataKind {
+			newOff, ok := cmp.offsetMap[canon[i].right.id]
+			if !ok {
+				return nil, fmt.Errorf("missing offsetMap entry for tree leaf right id %d", canon[i].right.id)
+			}
+			canon[i].right.id = newOff
+		}
+	}
+	return cmp.bytes, nil
+}
+
 // compactDataSection reduces the data section to only bytes reachable from
 // the canonicalized tree's leaf pointers, plus any records reachable
 // transitively through MMDB pointers within those records. Pointers in
