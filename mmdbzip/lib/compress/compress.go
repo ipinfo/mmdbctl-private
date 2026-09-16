@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log/slog"
-	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -168,11 +167,11 @@ func optimize(logger *slog.Logger,
 
 	// Phase 3: rewrite metadata's node_count. Other fields are preserved.
 	logger.Debug("phase3: rewrite metadata")
-	newMeta := make(map[string]any, len(meta))
-	maps.Copy(newMeta, meta)
-
-	newMeta["node_count"] = result.OutputNodeCount
-	newMetaBytes, err := encodeMetadata(newMeta)
+	// It's fine reusing the old meta data structure, other than changing the node count
+	// the data is identical and we don't use it after this phase other than to write it
+	// to file.
+	meta["node_count"] = result.OutputNodeCount
+	encodedMeta, err := encodeMetadata(meta)
 	if err != nil {
 		return result, fmt.Errorf("encode metadata: %w", err)
 	}
