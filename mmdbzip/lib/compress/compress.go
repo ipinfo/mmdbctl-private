@@ -160,6 +160,9 @@ func optimize(logger *slog.Logger,
 	logger.Debug(fmt.Sprintf("phase2: emit tree (%s)", HumanBytes(result.OutputTreeBytes)))
 	emitStartTime := time.Now()
 	newTree, err := emitTree(canon, uint64(recordSize), result.OutputNodeCount)
+	if err != nil {
+		return result, err
+	}
 	if uint64(len(newTree)) != result.OutputTreeBytes {
 		return result, fmt.Errorf("tree size mismatch: got %d want %d", len(newTree), result.OutputTreeBytes)
 	}
