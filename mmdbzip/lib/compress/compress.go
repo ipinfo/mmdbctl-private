@@ -180,23 +180,13 @@ func optimize(logger *slog.Logger,
 	// Phase 4: assemble the output file.
 	logger.Debug(fmt.Sprintf("phase4: write %s", outputPath))
 	writeStartTime := time.Now()
-	var out bytes.Buffer
-	out.Grow(len(newTree) + dataSectionSeparatorSize + len(emittedData) + len(metadataStartMarker) + len(newMetaBytes))
-	out.Write(newTree)
-	out.Write(make([]byte, dataSectionSeparatorSize))
-	out.Write(emittedData)
-	out.Write(metadataStartMarker)
-	out.Write(newMetaBytes)
-	result.OutputBytes = uint64(out.Len())
+	outputBytes, err := writeOutputFile(outputPath, newTree, emittedData, encodedMeta)
+	// We return these in the result in any case, even if there's an error so let's set them before
+	// checking for the error
+	result.OutputBytes = outputBytes
 	result.OutputDataBytes = uint64(len(emittedData))
-
-	if dir := filepath.Dir(outputPath); dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return result, fmt.Errorf("create output dir: %w", err)
-		}
-	}
-	if err := os.WriteFile(outputPath, out.Bytes(), 0o644); err != nil {
-		return result, fmt.Errorf("write output: %w", err)
+	if err != nil {
+		return result, err
 	}
 	logger.Debug(fmt.Sprintf("phase4: wrote %s in %s",
 		HumanBytes(uint64(result.OutputBytes)),
@@ -205,6 +195,37 @@ func optimize(logger *slog.Logger,
 	result.Elapsed = time.Since(startTime)
 
 	return result, nil
+}
+
+// writeOutputFile creates a new MMDB file at outputPath using the provided searchTree, data, and metadata.
+// If the file exists it's overwritten.
+// If the directories don't exist they are created.
+// Returns the number of bytes written to file.
+// Returns error if there's a failures creating the output directories or writing the file.
+func writeOutputFile(
+	outputPath string,
+	searchTree []byte,
+	data []byte,
+	metadata []byte,
+) (uint64, error) {
+	var out bytes.Buffer
+	out.Grow(len(searchTree) + dataSectionSeparatorSize + len(data) + len(metadataStartMarker) + len(metadata))
+	out.Write(searchTree)
+	out.Write(make([]byte, dataSectionSeparatorSize))
+	out.Write(data)
+	out.Write(metadataStartMarker)
+	out.Write(metadata)
+	outputBytes := uint64(out.Len())
+
+	if dir := filepath.Dir(outputPath); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return outputBytes, fmt.Errorf("create output dir: %w", err)
+		}
+	}
+	if err := os.WriteFile(outputPath, out.Bytes(), 0o644); err != nil {
+		return outputBytes, fmt.Errorf("write output: %w", err)
+	}
+	return outputBytes, nil
 }
 
 func logMemory(logger *slog.Logger, label string) {
