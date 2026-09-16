@@ -16,8 +16,9 @@ const (
 	dataSectionSeparatorSize = 16
 )
 
+// TODO
 type Options struct {
-	EnableCompact      bool
+	DisableCompact     bool
 	LogMemorySnapshots bool
 }
 
@@ -29,7 +30,7 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 		logger = slog.New(slog.DiscardHandler)
 	}
 
-	result, err := optimize(logger, inputPath, outputPath, opts.LogMemorySnapshots, opts.EnableCompact)
+	result, err := optimize(logger, inputPath, outputPath, opts.LogMemorySnapshots, opts.DisableCompact)
 	if err != nil {
 		return result, err
 	}
@@ -53,7 +54,7 @@ type CompressResult struct {
 func optimize(logger *slog.Logger,
 	inputPath, outputPath string,
 	logMemorySnapshots bool,
-	enableCompact bool,
+	disableCompact bool,
 ) (CompressResult, error) {
 	startTime := time.Now()
 	result := CompressResult{}
@@ -143,8 +144,7 @@ func optimize(logger *slog.Logger,
 	// MMDB pointers/kind 1), emit them contiguously into a new data section,
 	// rewrite tree leaf pointers with the new offsets.
 	emittedData := dataSection
-	if enableCompact {
-
+	if !disableCompact {
 		compactBytes, err := compact(logger, &canon, dataSection)
 		if err != nil {
 			// We don't format error as the error we receive is already formatted

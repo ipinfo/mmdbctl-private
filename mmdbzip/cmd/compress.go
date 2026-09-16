@@ -76,7 +76,7 @@ func cmdCompress(prog string, args []string) error {
 
 	logger := newLogger(verbose)
 	opts := compress.Options{
-		EnableCompact:      !disableCompact,
+		DisableCompact:     disableCompact,
 		LogMemorySnapshots: verbose,
 	}
 
