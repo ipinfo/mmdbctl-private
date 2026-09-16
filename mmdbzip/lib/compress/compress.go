@@ -144,12 +144,11 @@ func optimize(logger *slog.Logger,
 	// rewrite tree leaf pointers with the new offsets.
 	emittedData := dataSection
 	if !disableCompact {
-		compactBytes, err := compact(logger, canon, dataSection)
+		emittedData, err = compact(logger, canon, dataSection)
 		if err != nil {
 			// We don't format error as the error we receive is already formatted
 			return result, err
 		}
-		emittedData = compactBytes
 		if logMemorySnapshots {
 			logMemory(logger, "after-compact")
 		}
