@@ -157,15 +157,15 @@ func optimize(logger *slog.Logger,
 	// Phase 2: emit the new tree with rewritten pointers. Output node indices
 	// are assigned in canonicalization order, with the root pinned at index 0.
 	logger.Debug(fmt.Sprintf("phase2: emit tree (%s)", HumanBytes(result.OutputTreeBytes)))
-	emitStartTime := time.Now()
-	newTree, err := emitTree(canon, uint64(recordSize), result.OutputNodeCount)
+	buildTreeStartTime := time.Now()
+	searchTree, err := buildSearchTree(canon, uint64(recordSize))
 	if err != nil {
 		return result, err
 	}
-	if uint64(len(newTree)) != result.OutputTreeBytes {
-		return result, fmt.Errorf("tree size mismatch: got %d want %d", len(newTree), result.OutputTreeBytes)
+	if uint64(len(searchTree)) != result.OutputTreeBytes {
+		return result, fmt.Errorf("tree size mismatch: got %d want %d", len(searchTree), result.OutputTreeBytes)
 	}
-	logger.Debug(fmt.Sprintf("phase2: emit tree done in %s", time.Since(emitStartTime).Round(time.Millisecond)))
+	logger.Debug(fmt.Sprintf("phase2: emit tree done in %s", time.Since(buildTreeStartTime).Round(time.Millisecond)))
 
 	// Phase 3: rewrite metadata's node_count. Other fields are preserved.
 	logger.Debug("phase3: rewrite metadata")
@@ -181,7 +181,7 @@ func optimize(logger *slog.Logger,
 	// Phase 4: assemble the output file.
 	logger.Debug(fmt.Sprintf("phase4: write %s", outputPath))
 	writeStartTime := time.Now()
-	outputBytes, err := writeOutputFile(outputPath, newTree, emittedData, encodedMeta)
+	outputBytes, err := writeOutputFile(outputPath, searchTree, emittedData, encodedMeta)
 	// We return these in the result in any case, even if there's an error so let's set them before
 	// checking for the error
 	result.OutputBytes = outputBytes
@@ -236,12 +236,15 @@ func logMemory(logger *slog.Logger, label string) {
 		label, HumanBytes(m.Alloc), HumanBytes(m.Sys), HumanBytes(m.HeapInuse)))
 }
 
-func emitTree(nodes canonNodes, recordSize uint64, outNodeCount uint32) ([]byte, error) {
+// buildSearchTree turns the canonical nodes into raw mmdb tree bytes.
+// Returns an error if a pointer doesn't fit in recordSize bits.
+func buildSearchTree(nodes canonNodes, recordSize uint64) ([]byte, error) {
+	nodesCount := uint32(len(nodes))
 	nodeBytes := recordSize / 4
-	out := make([]byte, uint64(outNodeCount)*nodeBytes)
-	for i := range outNodeCount {
-		left := pointerToTreeValue(nodes[i].left, outNodeCount)
-		right := pointerToTreeValue(nodes[i].right, outNodeCount)
+	out := make([]byte, uint64(nodesCount)*nodeBytes)
+	for i := range nodesCount {
+		left := pointerToTreeValue(nodes[i].left, nodesCount)
+		right := pointerToTreeValue(nodes[i].right, nodesCount)
 		if err := writeNodePair(out, i, recordSize, left, right); err != nil {
 			return nil, err
 		}
