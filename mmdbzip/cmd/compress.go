@@ -16,8 +16,14 @@ import (
 
 var completionsCompress = &complete.Command{
 	Flags: map[string]complete.Predictor{
-		"-h":     predict.Nothing,
-		"--help": predict.Nothing,
+		"-h":           predict.Nothing,
+		"--help":       predict.Nothing,
+		"-v":           predict.Nothing,
+		"--verbose":    predict.Nothing,
+		"-o":           predict.Nothing,
+		"--overwrite":  predict.Nothing,
+		"--dry-run":    predict.Nothing,
+		"--no-compact": predict.Nothing,
 	},
 }
 
