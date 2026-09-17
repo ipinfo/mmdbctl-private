@@ -17,7 +17,8 @@ type canonNode struct {
 }
 type pointer struct {
 	kind pointerKind
-	id   uint32 // output node index (nodeKind) or data section byte offset (dataKind)
+	// output node index (nodeKind) or data section byte offset (dataKind)
+	id uint32
 }
 
 // pointerKind tags the meaning of a canonical pointer value:
@@ -42,10 +43,17 @@ type frame struct {
 	post bool
 }
 
-func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize uint64) (canonNodes, error) {
-	state := make([]uint8, nodeCount)           // 0 unvisited, 1 visiting, 2 done
-	canonicalValue := make([]uint64, nodeCount) // encoded pointer per input node
-	canonical := make(map[canonicalKey]uint32)  // canonicalKey -> output node index
+// canonicalize traverses treeBuffer and returns a deduplicated node list.
+// If a node has an identical child pair as another the previous one is reused, otherwise a new one is created.
+// If a non-root node's children are both empty the node itself becomes empty.
+// Orphan nodes are dropped.
+func canonicalize(logger *slog.Logger, treeBuffer []byte, nodeCount uint32, recordSize uint64) (canonNodes, error) {
+	// 0 unvisited, 1 visiting, 2 done
+	state := make([]uint8, nodeCount)
+	// encoded pointer per input node
+	canonicalValue := make([]uint64, nodeCount)
+	// canonicalKey -> output node index
+	canonical := make(map[canonicalKey]uint32)
 
 	output := []canonNode{}
 	// Pin output index 0 for the root. Will fill it in after the post-order
@@ -54,10 +62,7 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 
 	// Progress: log every ~5% finalized nodes (or every 10s, whichever first).
 	finalized := uint32(0)
-	progressEvery := nodeCount / 20
-	if progressEvery < 100_000 {
-		progressEvery = 100_000
-	}
+	progressEvery := max(nodeCount/20, 100_000)
 	tProgress := time.Now()
 
 	stack := []frame{{idx: 0}}
@@ -76,7 +81,7 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 			}
 			state[next.idx] = 1
 			stack = append(stack, frame{idx: next.idx, post: true})
-			left, right, err := readNodePair(buf, next.idx, recordSize)
+			left, right, err := readNodePair(treeBuffer, next.idx, recordSize)
 			if err != nil {
 				return canonNodes{}, err
 			}
@@ -90,7 +95,7 @@ func canonicalize(logger *slog.Logger, buf []byte, nodeCount uint32, recordSize 
 		}
 
 		// Post-order visit: compute encoded child pointers + intern.
-		left, right, err := readNodePair(buf, next.idx, recordSize)
+		left, right, err := readNodePair(treeBuffer, next.idx, recordSize)
 		if err != nil {
 			return canonNodes{}, err
 		}

@@ -15,15 +15,45 @@ const (
 	dataSectionSeparatorSize = 16
 )
 
-// TODO
+// Options configures the Compress function
 type Options struct {
-	DisableCompact     bool
+	// DisableCompact skips the data section compaction step
+	DisableCompact bool
+
+	// LogMemorySnapshots logs a memory snapshot after certain steps.
+	// This is expensive and recommended for debugging only as it calls
+	// runtime.ReadMemStats that stops the world.
 	LogMemorySnapshots bool
 }
 
+// CompressResult is the data return by the Compress function
+type CompressResult struct {
+	// InputBytes is the input file size
+	InputBytes uint64
+	// OutputBytes is the output file size
+	OutputBytes uint64
+	// InputNodeCount is the number of nodes in the input file
+	InputNodeCount uint32
+	// OutputNodeCount is the number of nodes in the output file
+	OutputNodeCount uint32
+	// InputTreeBytes is the size in bytes of the search tree in the input file
+	InputTreeBytes uint64
+	// OutputTreeBytes is the size in bytes of the search tree in the output file
+	OutputTreeBytes uint64
+	// InputDataBytes is the size in bytes of the data section in the input file
+	InputDataBytes uint64
+	// OutputDataBytes is the size in bytes of the data section in the output file
+	OutputDataBytes uint64
+	// MetadataBytes is size in bytes of the metadata section, we don't add or remove
+	// any key so the size is identical in input and output
+	MetadataBytes uint64
+	// Elapsed time from Compress start to finish
+	Elapsed time.Duration
+}
+
 // Compress reads the mmdb file at inputPath, deduplicates identical subtrees of
-// its search trie, and writes the smaller result to outputPath. The input file
-// is left untouched.
+// its search trie, and writes the smaller result to outputPath.
+// The input file is left untouched.
 func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (CompressResult, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
@@ -34,20 +64,6 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 		return result, err
 	}
 	return result, nil
-}
-
-// TODO
-type CompressResult struct {
-	InputBytes      uint64
-	OutputBytes     uint64
-	InputNodeCount  uint32
-	OutputNodeCount uint32
-	InputTreeBytes  uint64
-	OutputTreeBytes uint64
-	DataBytes       uint64
-	OutputDataBytes uint64
-	MetadataBytes   uint64
-	Elapsed         time.Duration
 }
 
 func optimize(logger *slog.Logger,
@@ -106,13 +122,13 @@ func optimize(logger *slog.Logger,
 	}
 	dataStart := treeBytes + dataSectionSeparatorSize
 	dataEnd := metaStart
-	result.DataBytes = dataEnd - dataStart
+	result.InputDataBytes = dataEnd - dataStart
 	result.MetadataBytes = uint64(result.InputBytes - metaStart)
 	logger.Debug(fmt.Sprintf("layout: nodes=%d record_size=%d tree=%s data=%s meta=%s",
 		nodeCount,
 		recordSize,
 		HumanBytes(result.InputTreeBytes),
-		HumanBytes(result.DataBytes),
+		HumanBytes(result.InputDataBytes),
 		HumanBytes(result.MetadataBytes),
 	))
 

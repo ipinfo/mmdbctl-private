@@ -39,6 +39,8 @@ type ptrLoc struct {
 	width uint8
 }
 
+// compact rebuilds the data section around what the canonical tree still
+// references, and rewrites the tree's leaf pointers to the new offsets.
 func compact(logger *slog.Logger, canon canonNodes, dataSection []byte) ([]byte, error) {
 	rootSet := make(map[uint32]struct{}, len(canon))
 	for _, n := range canon {
@@ -81,8 +83,8 @@ func compact(logger *slog.Logger, canon canonNodes, dataSection []byte) ([]byte,
 
 // compactDataSection reduces the data section to only bytes reachable from
 // the canonicalized tree's leaf pointers, plus any records reachable
-// transitively through MMDB pointers within those records. Pointers in
-// the output are encoded at the minimum width for their new target.
+// transitively through MMDB pointers within those records.
+// Pointers in the output are encoded at the minimum width for their new target.
 func compactDataSection(logger *slog.Logger, dataSection []byte, roots []uint32) (compactResult, error) {
 	tCompact := time.Now()
 	logger.Debug(fmt.Sprintf("compact: starting; %d unique tree-leaf data offsets", len(roots)))

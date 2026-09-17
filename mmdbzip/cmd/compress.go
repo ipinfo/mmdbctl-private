@@ -111,11 +111,11 @@ func printSummary(inputPath, outputPath string, res compress.CompressResult) {
 		compress.HumanBytes(res.InputTreeBytes),
 		compress.HumanBytes(res.OutputTreeBytes),
 	)
-	bytesDiff := int64(res.OutputDataBytes) - int64(res.DataBytes)
+	bytesDiff := int64(res.OutputDataBytes) - int64(res.InputDataBytes)
 	fmt.Fprintf(w, "  data:\t%s\t->\t%s\t%s\n",
-		compress.HumanBytes(res.DataBytes),
+		compress.HumanBytes(res.InputDataBytes),
 		compress.HumanBytes(res.OutputDataBytes),
-		formatPctDelta(bytesDiff, int64(res.DataBytes)),
+		formatPctDelta(bytesDiff, int64(res.InputDataBytes)),
 	)
 	w.Flush()
 
