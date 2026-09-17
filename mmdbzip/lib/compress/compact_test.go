@@ -2,8 +2,11 @@ package compress
 
 import (
 	"bytes"
+	"log/slog"
 	"testing"
 )
+
+var testLogger = slog.New(slog.DiscardHandler)
 
 // TestPointerClassBoundaries pins the MMDB pointer (kind 1) class boundaries
 // per the spec, so a future edit can't reintroduce the off-by-1024 we just
@@ -83,7 +86,7 @@ func TestCompactNestedAndIdentity(t *testing.T) {
 		0x42, 'h', 'i',
 		0x45, 'w', 'o', 'r', 'l', 'd',
 	}
-	res, err := compactDataSection(nil, section, []uint32{0, 3})
+	res, err := compactDataSection(testLogger, section, []uint32{0, 3})
 	if err != nil {
 		t.Fatalf("compactDataSection: %v", err)
 	}
@@ -113,7 +116,7 @@ func TestCompactRemovesDeadGap(t *testing.T) {
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0x45, 'w', 'o', 'r', 'l', 'd',
 	}
-	res, err := compactDataSection(nil, section, []uint32{0, 8})
+	res, err := compactDataSection(testLogger, section, []uint32{0, 8})
 	if err != nil {
 		t.Fatalf("compactDataSection: %v", err)
 	}
@@ -146,7 +149,7 @@ func TestCompactRewritesPointerWidthAcrossClassBoundary(t *testing.T) {
 	// offset target: utf8 "z".
 	section[target], section[target+1] = 0x41, 'z'
 
-	res, err := compactDataSection(nil, section, []uint32{0})
+	res, err := compactDataSection(testLogger, section, []uint32{0})
 	if err != nil {
 		t.Fatalf("compactDataSection: %v", err)
 	}
@@ -227,7 +230,7 @@ func TestCompactNestedOffsetAfterPointerWidthShrink(t *testing.T) {
 	section[farTarget] = 0x41
 	section[farTarget+1] = 'z'
 
-	res, err := compactDataSection(nil, section, []uint32{0, secondPtr})
+	res, err := compactDataSection(testLogger, section, []uint32{0, secondPtr})
 	if err != nil {
 		t.Fatalf("compactDataSection: %v", err)
 	}
