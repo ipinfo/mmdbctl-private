@@ -112,7 +112,7 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 	dataStart := treeBytes + dataSectionSeparatorSize
 	dataEnd := metaStart
 	result.InputDataBytes = dataEnd - dataStart
-	result.MetadataBytes = uint64(result.InputBytes - metaStart)
+	result.MetadataBytes = result.InputBytes - metaStart
 	logger.Debug(fmt.Sprintf("layout: nodes=%d record_size=%d tree=%s data=%s meta=%s",
 		nodeCount,
 		recordSize,
@@ -195,7 +195,7 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 		return result, err
 	}
 	logger.Debug(fmt.Sprintf("phase4: wrote %s in %s",
-		HumanBytes(uint64(result.OutputBytes)),
+		HumanBytes(result.OutputBytes),
 		time.Since(writeStartTime).Round(time.Millisecond),
 	))
 	result.Elapsed = time.Since(startTime)
