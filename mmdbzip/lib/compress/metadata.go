@@ -165,39 +165,14 @@ func (d *decoder) readValue() (any, error) {
 	}
 }
 
-// readSize decodes a length/count prefix per the MMDB spec:
-//
-//	size 0..28: literal value
-//	size 29:    next 1 byte is (length - 29)
-//	size 30:    next 2 bytes are (length - 285) big-endian
-//	size 31:    next 3 bytes are (length - 65821) big-endian
+// readSize decodes a length/count prefix
 func (d *decoder) readSize(size int) (int, error) {
-	switch {
-	case size <= 28:
-		return size, nil
-	case size == 29:
-		if d.off+1 > len(d.buf) {
-			return 0, errors.New("readSize: 29 ext")
-		}
-		v := int(d.buf[d.off])
-		d.off++
-		return v + 29, nil
-	case size == 30:
-		if d.off+2 > len(d.buf) {
-			return 0, errors.New("readSize: 30 ext")
-		}
-		v := int(binary.BigEndian.Uint16(d.buf[d.off:]))
-		d.off += 2
-		return v + 285, nil
-	case size == 31:
-		if d.off+3 > len(d.buf) {
-			return 0, errors.New("readSize: 31 ext")
-		}
-		v := int(d.buf[d.off])<<16 | int(d.buf[d.off+1])<<8 | int(d.buf[d.off+2])
-		d.off += 3
-		return v + 65821, nil
+	n, next, err := readSizeAt(d.buf, size, uint32(d.off))
+	if err != nil {
+		return 0, err
 	}
-	return 0, fmt.Errorf("readSize: invalid size %d", size)
+	d.off = int(next)
+	return int(n), nil
 }
 
 // readUintN decodes an N-byte big-endian unsigned int into a uint64. The
