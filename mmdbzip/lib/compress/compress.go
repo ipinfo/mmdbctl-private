@@ -1,4 +1,4 @@
-// Shrinks MaxMind DB files by deduplicating identical subtrees of the search trie,
+// Package compress shrinks MaxMind DB files by deduplicating identical subtrees of the search trie,
 // producing a smaller file with identical lookup semantics that any reader can open.
 package compress
 
