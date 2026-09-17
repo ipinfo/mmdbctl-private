@@ -58,18 +58,6 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 		logger = slog.New(slog.DiscardHandler)
 	}
 
-	result, err := optimize(logger, inputPath, outputPath, opts.LogMemorySnapshots, opts.DisableCompact)
-	if err != nil {
-		return result, err
-	}
-	return result, nil
-}
-
-func optimize(logger *slog.Logger,
-	inputPath, outputPath string,
-	logMemorySnapshots bool,
-	disableCompact bool,
-) (CompressResult, error) {
 	startTime := time.Now()
 	result := CompressResult{}
 
@@ -85,7 +73,7 @@ func optimize(logger *slog.Logger,
 		time.Since(timeRead).Round(time.Millisecond),
 	))
 
-	if logMemorySnapshots {
+	if opts.LogMemorySnapshots {
 		logMemory(logger, "after-read")
 	}
 
@@ -149,7 +137,7 @@ func optimize(logger *slog.Logger,
 		result.OutputNodeCount,
 		100.0*float64(int64(result.OutputNodeCount)-int64(nodeCount))/float64(nodeCount),
 	))
-	if logMemorySnapshots {
+	if opts.LogMemorySnapshots {
 		logMemory(logger, "after-canon")
 	}
 
@@ -158,13 +146,13 @@ func optimize(logger *slog.Logger,
 	// MMDB pointers/kind 1), emit them contiguously into a new data section,
 	// rewrite tree leaf pointers with the new offsets.
 	emittedData := dataSection
-	if !disableCompact {
+	if !opts.DisableCompact {
 		emittedData, err = compact(logger, canon, dataSection)
 		if err != nil {
 			// We don't format error as the error we receive is already formatted
 			return result, err
 		}
-		if logMemorySnapshots {
+		if opts.LogMemorySnapshots {
 			logMemory(logger, "after-compact")
 		}
 	}
