@@ -59,7 +59,7 @@ func cmdCompress(prog string, args []string) error {
 		return nil
 	}
 	if len(rest) < 2 && !dryRun {
-		return errors.New("Missing output file path")
+		return errors.New("missing output file path")
 	}
 
 	inputPath := rest[0]
@@ -71,7 +71,7 @@ func cmdCompress(prog string, args []string) error {
 	}
 
 	if _, err := os.Stat(outputPath); err == nil && !overwrite {
-		return errors.New("Output file exists, use --overwrite to overwrite it")
+		return errors.New("output file exists, use --overwrite to overwrite it")
 	}
 
 	logger := newLogger(verbose)

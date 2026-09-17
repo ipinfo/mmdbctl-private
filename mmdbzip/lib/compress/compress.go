@@ -65,7 +65,7 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 	timeRead := time.Now()
 	input, err := os.ReadFile(inputPath)
 	if err != nil {
-		return result, fmt.Errorf("Failure reading input file: %w", err)
+		return result, fmt.Errorf("failure reading input file: %w", err)
 	}
 	result.InputBytes = uint64(len(input))
 	logger.Debug(fmt.Sprintf("read: %s loaded in %s",
@@ -79,12 +79,12 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 
 	metaStart, metaBytes, err := findMetadata(input)
 	if err != nil {
-		return result, fmt.Errorf("Failure finding metadata: %w", err)
+		return result, fmt.Errorf("failure finding metadata: %w", err)
 	}
 
 	meta, err := decodeMetadata(metaBytes)
 	if err != nil {
-		return result, fmt.Errorf("Failure decoding metadata: %w", err)
+		return result, fmt.Errorf("failure decoding metadata: %w", err)
 	}
 
 	nodeCount, ok := meta["node_count"].(uint32)
@@ -123,11 +123,11 @@ func Compress(logger *slog.Logger, inputPath, outputPath string, opts Options) (
 	dataSection := input[dataStart:dataEnd]
 
 	// Phase 1: bottom-up canonical-ID assignment.
-	logger.Debug(fmt.Sprintf("Phase 1: canonicalize starting (%d input nodes)", nodeCount))
+	logger.Debug(fmt.Sprintf("phase 1: canonicalize starting (%d input nodes)", nodeCount))
 	canonicalizeStartTime := time.Now()
 	canon, err := canonicalize(logger, tree, nodeCount, uint64(recordSize))
 	if err != nil {
-		return result, fmt.Errorf("Failure during canonicalization: %w", err)
+		return result, fmt.Errorf("failure during canonicalization: %w", err)
 	}
 	result.OutputNodeCount = uint32(len(canon))
 	result.OutputTreeBytes = uint64(result.OutputNodeCount) * nodeBytes
