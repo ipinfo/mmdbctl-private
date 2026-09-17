@@ -101,21 +101,21 @@ func printSummary(inputPath, outputPath string, res compress.CompressResult) {
 		compress.HumanBytes(res.OutputBytes),
 		formatSizeDelta(int64(res.InputBytes), int64(res.OutputBytes)),
 	)
-	nodesDiff := res.OutputNodeCount - res.InputNodeCount
+	nodesDiff := int64(res.OutputNodeCount) - int64(res.InputNodeCount)
 	fmt.Fprintf(w, "  nodes:\t%s\t->\t%s\t%s\n",
 		commaInt(uint64(res.InputNodeCount)),
 		commaInt(uint64(res.OutputNodeCount)),
-		formatPctDelta(int64(nodesDiff), int64(res.InputNodeCount)),
+		formatPctDelta(nodesDiff, int64(res.InputNodeCount)),
 	)
 	fmt.Fprintf(w, "  tree:\t%s\t->\t%s\t\n",
 		compress.HumanBytes(res.InputTreeBytes),
 		compress.HumanBytes(res.OutputTreeBytes),
 	)
-	bytesDiff := res.OutputDataBytes - res.DataBytes
+	bytesDiff := int64(res.OutputDataBytes) - int64(res.DataBytes)
 	fmt.Fprintf(w, "  data:\t%s\t->\t%s\t%s\n",
 		compress.HumanBytes(res.DataBytes),
 		compress.HumanBytes(res.OutputDataBytes),
-		formatPctDelta(int64(bytesDiff), int64(res.DataBytes)),
+		formatPctDelta(bytesDiff, int64(res.DataBytes)),
 	)
 	w.Flush()
 
