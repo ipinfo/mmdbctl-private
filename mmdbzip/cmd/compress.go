@@ -33,6 +33,23 @@ Options:
   General:
     --help, -h
       show help.
+    --verbose, -v
+      log phase boundaries, memory snapshots and progress counts to stderr.
+      default: false.
+
+  Input/Output:
+    --overwrite, -o
+      overwrite the output file if it already exists.
+      default: false.
+    --dry-run
+      run the full compression but discard the output instead of writing it.
+      default: false.
+
+  Compression:
+    --no-compact
+      skip data-section compaction and copy the data section verbatim.
+      debug only.
+      default: false.
 `, prog)
 }
 
