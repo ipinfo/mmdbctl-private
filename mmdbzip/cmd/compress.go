@@ -82,8 +82,7 @@ func cmdCompress(prog string, args []string) error {
 
 	result, err := compress.Compress(logger, inputPath, outputPath, opts)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return err
 	}
 	printSummary(inputPath, outputPath, result)
 	return nil
