@@ -66,6 +66,9 @@ func cmdCompress(prog string, args []string) error {
 	var outputPath string
 	if dryRun {
 		outputPath = os.DevNull
+		// The check right after this one would always fail if we don't
+		// set overwrite to true as os.DevNull always exists.
+		overwrite = true
 	} else {
 		outputPath = rest[1]
 	}
