@@ -1,4 +1,5 @@
-// Minimal MMDB metadata codec for the standalone optimizer prototype.
+// Minimal MMDB metadata codec to decode the metadata map, replace node_count,
+// and encode it again.
 //
 // MMDB values are self-describing: each value starts with a "control byte"
 // whose top 3 bits encode the type (kind 1..7) and bottom 5 bits encode
@@ -20,6 +21,7 @@
 //
 // Pointers (kind 1) cannot reference outside the data section, so metadata
 // has none. We don't implement them here.
+
 package compress
 
 import (
