@@ -1,6 +1,7 @@
 package compress
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -61,6 +62,7 @@ func canonicalize(logger *slog.Logger, treeBuffer []byte, nodeCount uint32, reco
 	output = append(output, canonNode{})
 
 	// Progress: log every ~5% finalized nodes (or every 10s, whichever first).
+	progressEnabled := logger.Enabled(context.Background(), slog.LevelDebug)
 	finalized := uint32(0)
 	progressEvery := max(nodeCount/20, 100_000)
 	tProgress := time.Now()
@@ -131,7 +133,7 @@ func canonicalize(logger *slog.Logger, treeBuffer []byte, nodeCount uint32, reco
 		canonicalValue[next.idx] = encodePointer(pointer{kind: nodeKind, id: id})
 		state[next.idx] = 2
 		finalized++
-		if finalized%progressEvery == 0 || time.Since(tProgress) > 10*time.Second {
+		if progressEnabled && (finalized%progressEvery == 0 || time.Since(tProgress) > 10*time.Second) {
 			logger.Debug(fmt.Sprintf("phase1: finalized %d/%d (%.1f%%) — canonical=%d",
 				finalized,
 				nodeCount,
