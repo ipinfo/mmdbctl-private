@@ -19,8 +19,11 @@
 //	build_epoch                     uint64     (kind 9)
 //	description                     map<utf8,utf8>  (kind 7 of kind 2 to kind 2)
 //
-// Pointers (kind 1) cannot reference outside the data section, so metadata
-// has none. We don't implement them here.
+// The metadata section may contain pointers (kind 1); the upstream mmdbwriter
+// emits them by default for repeated values such as language codes. Their
+// targets are offsets relative to the start of the metadata section (the byte
+// after the marker). The decoder resolves them into plain values, so the
+// re-encoded metadata carries no pointers.
 
 package compress
 
@@ -91,7 +94,19 @@ func (d *decoder) readValue() (any, error) {
 	// directly (no extension).
 	switch kind {
 	case 1: // pointer
-		return nil, errors.New("decoder: pointer in metadata not supported")
+		target, next, err := readPointerAt(d.buf, size, uint32(d.off))
+		if err != nil {
+			return nil, fmt.Errorf("decoder: %w", err)
+		}
+		d.off = int(next)
+		if int(target) >= len(d.buf) {
+			return nil, fmt.Errorf("decoder: pointer target %d past metadata (%d)", target, len(d.buf))
+		}
+		if d.buf[target]>>5 == 1 {
+			return nil, fmt.Errorf("decoder: pointer @%d targets another pointer", target)
+		}
+		sub := &decoder{buf: d.buf, off: int(target)}
+		return sub.readValue()
 	case 2, 4: // utf8 string, bytes
 		n, err := d.readSize(size)
 		if err != nil {

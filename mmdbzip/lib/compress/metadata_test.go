@@ -123,3 +123,61 @@ func itoa(n int) string {
 	}
 	return string(b[i:])
 }
+
+// TestMetadataDecodesPointers covers pointers (kind 1) inside the metadata
+// section. The upstream mmdbwriter emits them by default whenever a value is
+// repeated, for example a language code that appears both as a description
+// key and a languages element, so rejecting them makes compress fail on any
+// database it or `mmdbctl import` produced. Pointer targets are relative to
+// the start of the metadata section.
+func TestMetadataDecodesPointers(t *testing.T) {
+	// map(2) { "a": "en", "b": ptr -> the "en" string }
+	//
+	// offset 0: 0xE2      map, 2 entries
+	// offset 1: 0x41 'a'  key "a"
+	// offset 3: 0x42 'e' 'n'   value "en"   <- pointer target (offset 3)
+	// offset 6: 0x41 'b'  key "b"
+	// offset 8: 0x20 0x03 class-0 pointer to offset 3
+	buf := []byte{
+		0xE2,
+		0x41, 'a',
+		0x42, 'e', 'n',
+		0x41, 'b',
+		0x20, 0x03,
+	}
+	m, err := decodeMetadata(buf)
+	if err != nil {
+		t.Fatalf("decodeMetadata: %v", err)
+	}
+	if got := m["a"]; got != "en" {
+		t.Errorf(`m["a"] = %#v, want "en"`, got)
+	}
+	if got := m["b"]; got != "en" {
+		t.Errorf(`m["b"] = %#v, want "en" (via pointer)`, got)
+	}
+
+	// Re-encoding resolves the pointer into a plain value and round-trips.
+	enc, err := encodeMetadata(m)
+	if err != nil {
+		t.Fatalf("encodeMetadata: %v", err)
+	}
+	dec, err := decodeMetadata(enc)
+	if err != nil {
+		t.Fatalf("decodeMetadata(re-encoded): %v", err)
+	}
+	if dec["a"] != "en" || dec["b"] != "en" {
+		t.Errorf("re-encoded metadata = %v, want a=en b=en", dec)
+	}
+
+	// A pointer to a pointer is invalid per the spec and must be rejected,
+	// not followed.
+	bad := []byte{
+		0xE1,
+		0x41, 'a',
+		0x20, 0x05, // offset 3: pointer -> offset 5
+		0x20, 0x03, // offset 5: pointer -> offset 3
+	}
+	if _, err := decodeMetadata(bad); err == nil {
+		t.Error("expected error for pointer-to-pointer metadata, got nil")
+	}
+}

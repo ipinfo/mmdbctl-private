@@ -53,3 +53,32 @@ func readSizeAt(buf []byte, sizeBits int, cur uint32) (uint32, uint32, error) {
 	}
 	return 0, 0, fmt.Errorf("invalid sizeBits %d", sizeBits)
 }
+
+// readPointerAt decodes the payload of an MMDB pointer (kind 1) whose control
+// byte holds sizeBits and whose payload starts at cur. It returns the target
+// offset and the offset just past the pointer's encoding.
+//
+// Pointer classes (per the MMDB spec, including the per-class additive offsets):
+//
+//	class 0: 1 payload byte,  value = 11 bits
+//	class 1: 2 payload bytes, value = 19 bits + 2048
+//	class 2: 3 payload bytes, value = 27 bits + 526336
+//	class 3: 4 payload bytes, value = 32 bits
+func readPointerAt(buf []byte, sizeBits int, cur uint32) (uint32, uint32, error) {
+	cls := (sizeBits >> 3) & 0x3
+	topBits := uint32(sizeBits & 0x7)
+	n := uint32(cls + 1)
+	if uint64(cur)+uint64(n) > uint64(len(buf)) {
+		return 0, 0, fmt.Errorf("ptr cls%d payload overruns @%d", cls, cur)
+	}
+	switch cls {
+	case 0:
+		return topBits<<8 | uint32(buf[cur]), cur + 1, nil
+	case 1:
+		return (topBits<<16 | uint32(buf[cur])<<8 | uint32(buf[cur+1])) + 2048, cur + 2, nil
+	case 2:
+		return (topBits<<24 | uint32(buf[cur])<<16 | uint32(buf[cur+1])<<8 | uint32(buf[cur+2])) + 526336, cur + 3, nil
+	default:
+		return binary.BigEndian.Uint32(buf[cur : cur+4]), cur + 4, nil
+	}
+}

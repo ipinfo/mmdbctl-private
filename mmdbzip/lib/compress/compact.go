@@ -510,36 +510,11 @@ func valueSpan(buf []byte, off uint32) (end uint32, ptrs []ptrLoc, err error) {
 
 	switch kind {
 	case 1: // pointer
-		cls := (sizeBits >> 3) & 0x3
-		topBits := uint32(sizeBits & 0x7)
-		switch cls {
-		case 0:
-			if int(cur)+1 > len(buf) {
-				return 0, nil, fmt.Errorf("ptr cls0 @%d", off)
-			}
-			v := topBits<<8 | uint32(buf[cur])
-			return cur + 1, []ptrLoc{{offset: off, target: v, width: 2}}, nil
-		case 1:
-			if int(cur)+2 > len(buf) {
-				return 0, nil, fmt.Errorf("ptr cls1 @%d", off)
-			}
-			v := topBits<<16 | uint32(buf[cur])<<8 | uint32(buf[cur+1])
-			v += 2048
-			return cur + 2, []ptrLoc{{offset: off, target: v, width: 3}}, nil
-		case 2:
-			if int(cur)+3 > len(buf) {
-				return 0, nil, fmt.Errorf("ptr cls2 @%d", off)
-			}
-			v := topBits<<24 | uint32(buf[cur])<<16 | uint32(buf[cur+1])<<8 | uint32(buf[cur+2])
-			v += 526336
-			return cur + 3, []ptrLoc{{offset: off, target: v, width: 4}}, nil
-		case 3:
-			if int(cur)+4 > len(buf) {
-				return 0, nil, fmt.Errorf("ptr cls3 @%d", off)
-			}
-			v := binary.BigEndian.Uint32(buf[cur : cur+4])
-			return cur + 4, []ptrLoc{{offset: off, target: v, width: 5}}, nil
+		target, end, err := readPointerAt(buf, sizeBits, cur)
+		if err != nil {
+			return 0, nil, fmt.Errorf("%w (ptr @%d)", err, off)
 		}
+		return end, []ptrLoc{{offset: off, target: target, width: uint8(end - off)}}, nil
 
 	case 2, 4: // utf8 string, bytes
 		n, after, err := readSizeAt(buf, sizeBits, cur)

@@ -79,10 +79,6 @@ func buildTestMMDB(t *testing.T, recordSize, ipVersion int) []byte {
 		IPVersion:               ipVersion,
 		RecordSize:              recordSize,
 		IncludeReservedNetworks: true,
-		// The metadata decoder does not resolve pointers yet, and mmdbwriter
-		// emits them by default for repeated metadata values. Tracked
-		// separately; drop this once the decoder handles them.
-		DisableMetadataPointers: true,
 	})
 	if err != nil {
 		t.Fatal(err)
